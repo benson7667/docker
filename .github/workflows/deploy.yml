@@ -8,8 +8,11 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    
+    # Set environment based on the branch that triggered the workflow
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || github.ref == 'refs/heads/staging' && 'staging' || 'development' }}
     
     steps:
     - uses: actions/checkout@v2
@@ -27,7 +30,7 @@ jobs:
           echo "environment=development" >> $GITHUB_OUTPUT
         elif [[ ${{ github.ref }} == 'refs/heads/staging' ]]; then
           echo "environment=staging" >> $GITHUB_OUTPUT
-        elif [[ ${{ github.ref }} == 'refs/heads/master' ]]; then
+        elif [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
           echo "environment=production" >> $GITHUB_OUTPUT
         fi
     
@@ -37,24 +40,8 @@ jobs:
         context: .
         push: true
         tags: |
-          your-dockerhub-username/react-app:${{ steps.set-env.outputs.environment }}
-          your-dockerhub-username/react-app:${{ github.sha }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Set environment based on branch
-      id: set-env
-      run: |
-        if [[ ${{ github.ref }} == 'refs/heads/dev' ]]; then
-          echo "environment=development" >> $GITHUB_OUTPUT
-        elif [[ ${{ github.ref }} == 'refs/heads/staging' ]]; then
-          echo "environment=staging" >> $GITHUB_OUTPUT
-        elif [[ ${{ github.ref }} == 'refs/heads/master' ]]; then
-          echo "environment=production" >> $GITHUB_OUTPUT
-        fi
+          ${{ secrets.DOCKER_HUB_USERNAME }}/react-app:${{ steps.set-env.outputs.environment }}
+          ${{ secrets.DOCKER_HUB_USERNAME }}/react-app:${{ github.sha }}
 
     - name: Deploy to environment
       uses: appleboy/ssh-action@master
