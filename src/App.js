@@ -2,6 +2,12 @@ import logo from './logo.svg';
 import './App.css';
 
 function App() {
+  // Access runtime environment variables
+  const apiUrl = window._env_.REACT_APP_API_URL;
+  const environment = window._env_.REACT_APP_ENV;
+
+  console.log({apiUrl, environment});
+
   return (
     <div className="App">
       <header className="App-header">
