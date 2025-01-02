@@ -1,8 +1,11 @@
 name: Deploy React App
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - dev
+      - staging
+      - master
 
 jobs:
   build:
@@ -17,35 +20,53 @@ jobs:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
     
+    - name: Set environment based on branch
+      id: set-env
+      run: |
+        if [[ ${{ github.ref }} == 'refs/heads/dev' ]]; then
+          echo "environment=development" >> $GITHUB_OUTPUT
+        elif [[ ${{ github.ref }} == 'refs/heads/staging' ]]; then
+          echo "environment=staging" >> $GITHUB_OUTPUT
+        elif [[ ${{ github.ref }} == 'refs/heads/master' ]]; then
+          echo "environment=production" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Build and push Docker image
       uses: docker/build-push-action@v2
       with:
         context: .
         push: true
         tags: |
-          your-dockerhub-username/react-app:${{ github.event.release.tag_name }}
-          your-dockerhub-username/react-app:latest
+          your-dockerhub-username/react-app:${{ steps.set-env.outputs.environment }}
+          your-dockerhub-username/react-app:${{ github.sha }}
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     
-    strategy:
-      matrix:
-        environment: [development, staging, production]
-    
-    environment: ${{ matrix.environment }}
-    
     steps:
+    - name: Set environment based on branch
+      id: set-env
+      run: |
+        if [[ ${{ github.ref }} == 'refs/heads/dev' ]]; then
+          echo "environment=development" >> $GITHUB_OUTPUT
+        elif [[ ${{ github.ref }} == 'refs/heads/staging' ]]; then
+          echo "environment=staging" >> $GITHUB_OUTPUT
+        elif [[ ${{ github.ref }} == 'refs/heads/master' ]]; then
+          echo "environment=production" >> $GITHUB_OUTPUT
+        fi
+
     - name: Deploy to environment
       uses: appleboy/ssh-action@master
+      env:
+        ENVIRONMENT: ${{ steps.set-env.outputs.environment }}
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_KEY }}
+        envs: ENVIRONMENT
         script: |
           docker-compose pull
           docker-compose up -d \
             -e REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }} \
-            -e REACT_APP_ENV=${{ matrix.environment }} \
-            # Add other environment variables as needed 
+            -e REACT_APP_ENV=$ENVIRONMENT 
